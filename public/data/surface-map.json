@@ -1,0 +1,20 @@
+{
+  "title": "Natural Earth II surface colors for a fixed screen dot globe",
+  "width": 1440,
+  "height": 720,
+  "projection": "Equirectangular (WGS84)",
+  "bounds": {
+    "west": -180,
+    "east": 180,
+    "north": 90,
+    "south": -90
+  },
+  "source": "Natural Earth II, 1:50m, shaded relief and water",
+  "sourceUrl": "https://naturalearth.s3.amazonaws.com/50m_raster/NE2_50M_SR_W.zip",
+  "sourceSha256": "7e0e07089b699a3cccad98dd1b2446390d8e3f8c5006359d477a329cebcafaa9",
+  "sourcePage": "https://www.naturalearthdata.com/downloads/50m-raster-data/50m-natural-earth-2/",
+  "license": "Public domain",
+  "licenseUrl": "https://www.naturalearthdata.com/about/terms-of-use/",
+  "processing": "Lanczos downsampling; continuous blue/green/sand color enhancement from source hues; neutral ice retained.",
+  "limitation": "Idealized historical land cover, not current satellite imagery or a precise biome classification."
+}
