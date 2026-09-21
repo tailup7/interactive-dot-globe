@@ -131,7 +131,7 @@
           </div>
           <div class="control-block display-control">
             <div class="control-heading">
-              <span><span class="control-number">03</span>地表の色</span
+              <span><span class="control-number">03</span>地表と雲</span
               ><button
                 id="reset"
                 class="reset-button"
@@ -156,16 +156,32 @@
                 </li>
                 <li><span class="legend-ice" aria-hidden="true"></span>氷雪</li>
               </ul>
-              <label class="grid-label"
-                ><input id="show-grid" type="checkbox" /><span
-                  class="custom-checkbox"
-                  aria-hidden="true"
-                ></span
-                >経緯線を表示</label
-              >
+              <div class="overlay-options">
+                <label class="grid-label"
+                  ><input id="show-clouds" type="checkbox" checked /><span
+                    class="custom-checkbox"
+                    aria-hidden="true"
+                  ></span
+                  >雲を表示</label
+                >
+                <label class="grid-label"
+                  ><input id="show-grid" type="checkbox" /><span
+                    class="custom-checkbox"
+                    aria-hidden="true"
+                  ></span
+                  >経緯線を表示</label
+                >
+              </div>
             </div>
           </div>
         </section>
+
+        <p class="cloud-meta">
+          <span id="cloud-status" role="status">雲データを読み込み中</span>
+          <a id="cloud-source-link" target="_blank" rel="noreferrer" hidden
+            >データの出典 <span aria-hidden="true">↗</span></a
+          >
+        </p>
 
         <section
           class="how-it-works"

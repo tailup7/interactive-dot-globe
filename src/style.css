@@ -511,6 +511,11 @@ input[type="range"]::-moz-range-thumb {
   background: #e1e6df;
   box-shadow: inset 0 0 0 1px #bdc8c4;
 }
+.overlay-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
 .grid-label {
   display: flex;
   align-items: center;
@@ -556,6 +561,30 @@ input[type="range"]::-moz-range-thumb {
 .grid-label input:focus-visible + .custom-checkbox {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
+}
+.grid-label input:disabled {
+  cursor: not-allowed;
+}
+.grid-label input:disabled + .custom-checkbox {
+  opacity: 0.4;
+}
+.cloud-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 12px 2px 0;
+  color: #85897d;
+  font-size: 9px;
+  line-height: 1.8;
+}
+.cloud-meta a {
+  color: #6b7067;
+  text-decoration: underline;
+  text-decoration-color: #c8cabe;
+  text-underline-offset: 3px;
+}
+.cloud-meta a:hover {
+  color: var(--accent);
 }
 .how-it-works {
   padding: 48px 0 46px;

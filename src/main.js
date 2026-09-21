@@ -1,6 +1,7 @@
 import "./style.css";
 import { GlobeMotion, rotateVector } from "./motion.js";
 import { GlobeRenderer } from "./renderer.js";
+import { parseCloudSnapshot } from "./clouds.js";
 
 const DEFAULT_SPEED = 0.13;
 const canvas = document.querySelector("#globe");
@@ -11,6 +12,9 @@ const autoRotate = document.querySelector("#auto-rotate");
 const speed = document.querySelector("#speed");
 const speedValue = document.querySelector("#speed-value");
 const grid = document.querySelector("#show-grid");
+const cloudToggle = document.querySelector("#show-clouds");
+const cloudStatus = document.querySelector("#cloud-status");
+const cloudSource = document.querySelector("#cloud-source-link");
 const loading = document.querySelector("#loading-message");
 const coordinates = document.querySelector("#coordinates");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -22,6 +26,7 @@ let frameId = 0;
 let previousFrame = 0;
 let lastCoordinateUpdate = 0;
 let requestInFlight = false;
+let cloudSnapshotPromise;
 
 function updateStatus() {
   const state = motion.dragging
@@ -202,6 +207,10 @@ grid.addEventListener("change", () => {
   if (renderer) renderer.showGrid = grid.checked;
   invalidate();
 });
+cloudToggle.addEventListener("change", () => {
+  if (renderer) renderer.showClouds = cloudToggle.checked;
+  invalidate();
+});
 
 document.querySelector("#reset").addEventListener("click", () => {
   endDrag();
@@ -211,6 +220,8 @@ document.querySelector("#reset").addEventListener("click", () => {
   updateSpeed();
   grid.checked = false;
   if (renderer) renderer.showGrid = false;
+  cloudToggle.checked = Boolean(renderer?.clouds);
+  if (renderer) renderer.showClouds = cloudToggle.checked;
   updateCoordinates();
   previousFrame = 0;
   updateStatus();
@@ -250,6 +261,56 @@ reducedMotion.addEventListener("change", (event) => {
   }
 });
 
+/** Load the local build snapshot once, also across terrain-load retries. */
+function getCloudSnapshot() {
+  cloudSnapshotPromise ??= (async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.BASE_URL}data/clouds.json`,
+        {
+          signal: AbortSignal.timeout(10000),
+        },
+      );
+      if (!response.ok) throw new Error(`Cloud data: HTTP ${response.status}`);
+      const clouds = parseCloudSnapshot(await response.json());
+      const date = new Intl.DateTimeFormat("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZoneName: "short",
+      }).format(new Date(clouds.observedAt));
+      const kind = {
+        forecast: "モデル推定",
+        analysis: "解析値",
+        satellite: "衛星観測",
+      }[clouds.source.kind];
+      const missing =
+        clouds.coverage < 1
+          ? ` · データなし ${((1 - clouds.coverage) * 100).toFixed(1)}%`
+          : "";
+      cloudStatus.textContent = `雲の対象日時：${date} · ${kind}${missing}`;
+      cloudStatus.dataset.observedAt = clouds.observedAt;
+      cloudSource.textContent = clouds.source.name;
+      cloudSource.href = clouds.source.url;
+      cloudSource.title = clouds.source.attribution;
+      cloudSource.hidden = false;
+      cloudToggle.disabled = false;
+      return clouds;
+    } catch {
+      cloudStatus.textContent =
+        "雲データを利用できません。地表のみ表示しています。";
+      cloudSource.hidden = true;
+      cloudToggle.checked = false;
+      cloudToggle.disabled = true;
+      return null;
+    }
+  })();
+  return cloudSnapshotPromise;
+}
+
 async function initialize() {
   if (requestInFlight) return;
   requestInFlight = true;
@@ -257,6 +318,7 @@ async function initialize() {
   loading.classList.remove("is-error");
   loading.textContent = "世界を描いています…";
   status.textContent = "読み込み中";
+  const cloudsPromise = getCloudSnapshot();
   try {
     const response = await fetch(
       `${import.meta.env.BASE_URL}data/surface-map.png`,
@@ -281,8 +343,10 @@ async function initialize() {
     } finally {
       image.close();
     }
-    renderer = new GlobeRenderer(canvas, surface);
+    const clouds = await cloudsPromise;
+    renderer = new GlobeRenderer(canvas, surface, clouds);
     renderer.showGrid = grid.checked;
+    renderer.showClouds = cloudToggle.checked;
     renderer.draw(motion.orientation);
     loading.hidden = true;
     updateStatus();

@@ -1,5 +1,6 @@
 import { rotateVector } from "./motion.js";
 import { createDotGrid, sampleSurface } from "./surface.js";
+import { sampleCloudCover } from "./clouds.js";
 
 const TAU = Math.PI * 2;
 
@@ -8,7 +9,7 @@ const TAU = Math.PI * 2;
  * each dot: neither its path, position, nor radius depends on orientation.
  */
 export class GlobeRenderer {
-  constructor(canvas, surface) {
+  constructor(canvas, surface, clouds = null) {
     this.canvas = canvas;
     this.context = canvas.getContext("2d", { alpha: true });
     if (!this.context) throw new Error("Canvas 2D is unavailable");
@@ -22,6 +23,8 @@ export class GlobeRenderer {
       throw new Error("Invalid surface image");
     }
     this.surface = surface;
+    this.clouds = clouds;
+    this.showClouds = true;
     this.showGrid = false;
     this.width = 0;
     this.height = 0;
@@ -122,6 +125,13 @@ export class GlobeRenderer {
       const y = inverse[3] * nx + inverse[4] * ny + inverse[5] * nz;
       const z = inverse[6] * nx + inverse[7] * ny + inverse[8] * nz;
       const color = sampleSurface(this.surface, x, y, z, this.sample);
+      if (this.showClouds && this.clouds) {
+        const opacity =
+          Math.pow(sampleCloudCover(this.clouds, x, y, z), 1.1) * 0.88;
+        color[0] += (245 - color[0]) * opacity;
+        color[1] += (248 - color[1]) * opacity;
+        color[2] += (252 - color[2]) * opacity;
+      }
       // Five bits per channel retains the atlas's many terrain colors while
       // letting us reuse CSS color strings instead of allocating per dot/frame.
       const red = Math.min(31, Math.round(((color[0] * shade) / 255) * 31));

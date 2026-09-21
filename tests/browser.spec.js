@@ -1,15 +1,39 @@
 import { test, expect, devices } from '@playwright/test';
 
 const runtimeErrors = new WeakMap();
+const cloudRequests = new WeakMap();
 const { defaultBrowserType: mobileBrowserType, ...mobileDevice } = devices['Pixel 7'];
+
+function cloudSnapshot(cover = 0) {
+  return {
+    version: 1,
+    width: 8,
+    height: 4,
+    values: Array(32).fill(cover),
+    observedAt: '2026-09-21T12:00:00Z',
+    fetchedAt: '2026-09-21T12:10:00Z',
+    source: {
+      name: 'Test cloud analysis',
+      url: 'https://example.com/clouds',
+      kind: 'forecast',
+      attribution: 'Test weather data',
+    },
+  };
+}
 
 test.beforeEach(async ({ page }) => {
   const errors = [];
   runtimeErrors.set(page, errors);
+  const requests = [];
+  cloudRequests.set(page, requests);
+  page.on('request', (request) => requests.push(request.url()));
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
+  // A checked-in weather snapshot may change between builds; keep UI tests
+  // deterministic and independent of live weather services.
+  await page.route('**/data/clouds.json', (route) => route.fulfill({ json: cloudSnapshot() }));
   await page.goto('/');
   await expect(page.locator('#globe')).toHaveAttribute('data-state', /running|paused/);
   await expect(page.locator('#loading-message')).toBeHidden();
@@ -244,6 +268,143 @@ test('the initial geographic map displays blue oceans, green land, and brown dry
   expect(counts.desert).toBeGreaterThan(100);
 });
 
+test('cloud cover brightens the fixed diamonds without changing their geometry or transparency', async ({ page }) => {
+  const result = await page.evaluate(async (snapshot) => {
+    const { GlobeRenderer } = await import('/src/renderer.js');
+    const { parseCloudSnapshot } = await import('/src/clouds.js');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:420px;height:420px;position:fixed;left:-1000px;top:0';
+    document.body.append(canvas);
+    const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+    const surface = { width: 2, height: 2, pixels: new Uint8ClampedArray(Array(4).fill([25, 80, 140, 255]).flat()) };
+    const renderer = new GlobeRenderer(canvas, surface, parseCloudSnapshot(snapshot));
+    const dots = renderer.dots;
+    const paths = renderer.dotPaths.slice();
+    const dotRadius = renderer.dotRadius;
+    const capture = (orientation = [0, 0, 0, 1]) => {
+      renderer.draw(orientation);
+      return context.getImageData(0, 0, canvas.width, canvas.height).data;
+    };
+    try {
+      const cloudy = capture();
+      renderer.showClouds = false;
+      const clear = capture();
+      renderer.showClouds = true;
+      const repeated = capture();
+      const rotated = capture([0, Math.SQRT1_2, 0, Math.SQRT1_2]);
+      let alphaChanges = 0;
+      let brightenedPixels = 0;
+      let maximumNeutrality = 0;
+      for (let index = 0; index < cloudy.length; index += 4) {
+        if (cloudy[index + 3] !== clear[index + 3] || cloudy[index + 3] !== rotated[index + 3]) alphaChanges += 1;
+        if (cloudy[index + 3] < 250 || cloudy[index] <= clear[index] + 25) continue;
+        brightenedPixels += 1;
+        maximumNeutrality = Math.max(maximumNeutrality,
+          Math.max(...cloudy.subarray(index, index + 3)) - Math.min(...cloudy.subarray(index, index + 3)));
+      }
+      // Put clouds only west of Greenwich. A positive yaw must bring this
+      // geographic band to the center with the same inverse lookup as terrain.
+      renderer.clouds = parseCloudSnapshot({
+        ...snapshot,
+        values: snapshot.values.map((_, index) => [1, 2].includes(index % snapshot.width) ? 1 : 0),
+      });
+      const localized = capture();
+      const localizedTurn = capture([0, Math.SQRT1_2, 0, Math.SQRT1_2]);
+      const center = (Math.floor(canvas.height / 2) * canvas.width + Math.floor(canvas.width / 2)) * 4;
+      return {
+        alphaChanges,
+        brightenedPixels,
+        maximumNeutrality,
+        unchangedGeometry: renderer.dots === dots && renderer.dotRadius === dotRadius
+          && paths.every((path, index) => renderer.dotPaths[index] === path),
+        toggleRestoresImage: cloudy.every((byte, index) => byte === repeated[index]),
+        cloudBandArrivesAtCenter: localizedTurn[center] - localized[center],
+      };
+    } finally {
+      canvas.remove();
+    }
+  }, cloudSnapshot(1));
+  expect(result.alphaChanges).toBe(0);
+  expect(result.brightenedPixels).toBeGreaterThan(1000);
+  expect(result.maximumNeutrality).toBeLessThan(60);
+  expect(result.unchangedGeometry).toBe(true);
+  expect(result.toggleRestoresImage).toBe(true);
+  expect(result.cloudBandArrivesAtCenter).toBeGreaterThan(100);
+});
+
+test('cloud snapshot is loaded once and toggling, dragging, and reset reuse that snapshot', async ({ page }) => {
+  let snapshots = 0;
+  await page.route('**/data/clouds.json', (route) => {
+    snapshots += 1;
+    return route.fulfill({ json: cloudSnapshot(1) });
+  });
+  await page.reload();
+  await expect(page.locator('#globe')).toHaveAttribute('data-state', 'running');
+  await expect(page.locator('#show-clouds')).toBeChecked();
+  await expect(page.locator('#show-clouds')).toBeEnabled();
+  await expect(page.locator('#cloud-status')).toContainText('2026');
+  await expect(page.locator('#cloud-status')).toHaveAttribute('data-observed-at', '2026-09-21T12:00:00.000Z');
+  await expect(page.getByRole('link', { name: 'Test cloud analysis' })).toHaveAttribute('href', 'https://example.com/clouds');
+  await page.locator('#auto-rotate').click();
+  await settleFrame(page);
+  const cloudy = await canvasImage(page);
+  await page.locator('#show-clouds').uncheck();
+  await settleFrame(page);
+  expect(await canvasImage(page)).not.toBe(cloudy);
+  await page.locator('#show-clouds').check();
+  await settleFrame(page);
+  expect(await canvasImage(page)).toBe(cloudy);
+  await page.locator('#show-clouds').uncheck();
+  const canvas = page.locator('#globe');
+  const box = await canvas.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 55, box.y + box.height / 2 - 30, { steps: 3 });
+  await page.mouse.up();
+  await expectDirection(page, 55, -30);
+  await page.locator('#reset').click();
+  await expect(page.locator('#show-clouds')).toBeChecked();
+  await expect(canvas).toHaveAttribute('data-state', 'running');
+  await settleFrame(page);
+  expect(snapshots).toBe(1);
+  // Existing web fonts are external assets; weather data must stay local.
+  const assetHosts = ['127.0.0.1', 'fonts.googleapis.com', 'fonts.gstatic.com'];
+  const externalRequests = cloudRequests.get(page).filter((url) => (
+    /^https?:/.test(url) && !assetHosts.includes(new URL(url).hostname)
+  ));
+  expect(externalRequests, 'Weather services must only be contacted during snapshot generation').toEqual([]);
+});
+
+for (const unavailable of [
+  { name: 'missing', status: 404, body: 'Not found' },
+  { name: 'invalid JSON', status: 200, body: '{broken json' },
+  { name: 'invalid schema', status: 200, body: JSON.stringify({ ...cloudSnapshot(), values: [2] }) },
+]) {
+  test(`a ${unavailable.name} cloud snapshot leaves the globe usable with an unavailable label`, async ({ page }) => {
+    let attempts = 0;
+    await page.route('**/data/clouds.json', (route) => {
+      attempts += 1;
+      return route.fulfill({ status: unavailable.status, contentType: 'application/json', body: unavailable.body });
+    });
+    await page.reload();
+    await expect(page.locator('#globe')).toHaveAttribute('data-state', 'running');
+    await expect(page.locator('#loading-message')).toBeHidden();
+    await expect(page.locator('#cloud-status')).toContainText('雲データを利用できません');
+    await expect(page.locator('#show-clouds')).toBeDisabled();
+    const initial = await canvasImage(page);
+    await expect.poll(() => canvasImage(page)).not.toBe(initial);
+    await page.locator('#reset').click();
+    await expect(page.locator('#globe')).toHaveAttribute('data-state', 'running');
+    await expect(page.locator('#show-clouds')).toBeDisabled();
+    await settleFrame(page);
+    expect(attempts).toBe(1);
+    // Chromium logs an HTTP error for the deliberately absent fixture.
+    const errors = runtimeErrors.get(page);
+    expect(errors.every((message) => unavailable.status === 404 && /Failed to load resource:.*404/.test(message))).toBe(true);
+    errors.length = 0;
+  });
+}
+
 test('dragging follows every direction and preserves the last direction after release', async ({ page }) => {
   const canvas = page.locator('#globe');
   const box = await canvas.boundingBox();
@@ -288,7 +449,7 @@ test('speed and grid controls reset to their initial settings', async ({ page })
   await expect(page.locator('#speed')).toHaveValue('2');
   await expect(page.locator('#speed-value')).toHaveText('2.0×');
   await expectSpeed(page, 0.26);
-  await page.locator('.grid-label').click();
+  await page.locator('#show-grid').check();
   await expect(page.locator('#show-grid')).toBeChecked();
   await page.locator('#auto-rotate').click();
   await page.locator('#reset').click();
@@ -323,6 +484,8 @@ test('keyboard arrows rotate the globe and space toggles automatic motion', asyn
 
 test('a failed map request shows an error and recovers using the retry button', async ({ page }) => {
   let attempts = 0;
+  const snapshotCount = () => cloudRequests.get(page).filter((url) => new URL(url).pathname.endsWith('/data/clouds.json')).length;
+  const initialSnapshots = snapshotCount();
   await page.route('**/data/surface-map.png', async (route) => {
     attempts += 1;
     if (attempts === 1) await route.fulfill({ status: 503, body: 'Service unavailable' });
@@ -343,6 +506,7 @@ test('a failed map request shows an error and recovers using the retry button', 
   await expect(page.locator('#globe')).toHaveAttribute('data-state', 'running');
   await expect(page.locator('#loading-message')).toBeHidden();
   expect(attempts).toBe(2);
+  expect(snapshotCount() - initialSnapshots, 'Retrying terrain must reuse this page’s cloud snapshot').toBe(1);
 });
 
 test.describe('reduced motion', () => {
