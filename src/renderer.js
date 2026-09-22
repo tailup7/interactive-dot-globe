@@ -1,7 +1,7 @@
-import { rotateVector } from "./motion.js";
-import { createDotGrid, sampleSurface } from "./surface.js";
-import { sampleCloudCover } from "./clouds.js";
-import { revealOpacity } from "./reveal.js";
+import { rotateVector } from './motion.js';
+import { createDotGrid, sampleSurface } from './surface.js';
+import { sampleCloudCover } from './clouds.js';
+import { revealOpacity } from './reveal.js';
 
 const TAU = Math.PI * 2;
 
@@ -12,8 +12,8 @@ const TAU = Math.PI * 2;
 export class GlobeRenderer {
   constructor(canvas, surface, clouds = null) {
     this.canvas = canvas;
-    this.context = canvas.getContext("2d", { alpha: true });
-    if (!this.context) throw new Error("Canvas 2D is unavailable");
+    this.context = canvas.getContext('2d', { alpha: true });
+    if (!this.context) throw new Error('Canvas 2D is unavailable');
     if (
       !Number.isInteger(surface.width) ||
       !Number.isInteger(surface.height) ||
@@ -21,7 +21,7 @@ export class GlobeRenderer {
       surface.height <= 0 ||
       surface.pixels?.length !== surface.width * surface.height * 4
     ) {
-      throw new Error("Invalid surface image");
+      throw new Error('Invalid surface image');
     }
     this.surface = surface;
     this.clouds = clouds;
@@ -80,27 +80,9 @@ export class GlobeRenderer {
     ctx.clearRect(0, 0, this.width, this.height);
     if (!r) return;
 
-    ctx.strokeStyle = "rgba(96,126,133,0.14)";
-    ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.075, 0, TAU);
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(96,126,133,0.26)";
-    ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const angle = (i * Math.PI) / 2;
-      const x = cx + Math.cos(angle) * r * 1.075;
-      const y = cy + Math.sin(angle) * r * 1.075;
-      ctx.moveTo(x - 3, y);
-      ctx.lineTo(x + 3, y);
-      ctx.moveTo(x, y - 3);
-      ctx.lineTo(x, y + 3);
-    }
-    ctx.stroke();
-
     const halo = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
-    halo.addColorStop(0, "rgba(178,203,199,0.025)");
-    halo.addColorStop(1, "rgba(178,203,199,0.12)");
+    halo.addColorStop(0, 'rgba(178,203,199,0.025)');
+    halo.addColorStop(1, 'rgba(178,203,199,0.12)');
     ctx.fillStyle = halo;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, TAU);
@@ -157,7 +139,7 @@ export class GlobeRenderer {
 
   drawGraticule(orientation) {
     const ctx = this.context;
-    ctx.strokeStyle = "rgba(72,95,106,0.25)";
+    ctx.strokeStyle = 'rgba(72,95,106,0.25)';
     ctx.lineWidth = 0.65;
     ctx.setLineDash([2, 4]);
     const line = (points) => {

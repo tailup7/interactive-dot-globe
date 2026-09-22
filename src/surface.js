@@ -15,7 +15,10 @@ export function createDotGrid(width, height) {
     return { dots: [], radius: 0, dotRadius: 0 };
   }
   const radius = Math.min(width, height) * 0.378;
-  const spacing = Math.max(3.2, radius / 55);
+  // Reducing both lattice pitches by √2 doubles the number of fixed dots
+  // covering the same circular area while preserving their proportions.
+  const densityScale = Math.SQRT2;
+  const spacing = Math.max(3.2 / densityScale, radius / (55 * densityScale));
   const horizontalPitch = spacing * Math.SQRT2;
   // A diamond's side is 80% of the nearest-neighbor center spacing.
   // Parallel edges therefore have half the gap of the previous circular dots.

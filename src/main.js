@@ -1,20 +1,20 @@
-import "./style.css";
-import { DEFAULT_SPEED, GlobeMotion } from "./motion.js";
-import { GlobeRenderer } from "./renderer.js";
-import { parseCloudSnapshot } from "./clouds.js";
-import { GlobeReveal } from "./reveal.js";
+import './style.css';
+import { DEFAULT_SPEED, GlobeMotion } from './motion.js';
+import { GlobeRenderer } from './renderer.js';
+import { parseCloudSnapshot } from './clouds.js';
+import { GlobeReveal } from './reveal.js';
 
-const canvas = document.querySelector("#globe");
-const stage = document.querySelector("#globe-stage");
-const autoRotate = document.querySelector("#auto-rotate");
-const speed = document.querySelector("#speed");
-const speedValue = document.querySelector("#speed-value");
-const grid = document.querySelector("#show-grid");
-const cloudToggle = document.querySelector("#show-clouds");
-const cloudStatus = document.querySelector("#cloud-status");
-const cloudSource = document.querySelector("#cloud-source-link");
-const loading = document.querySelector("#loading-message");
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const canvas = document.querySelector('#globe');
+const stage = document.querySelector('#globe-stage');
+const autoRotate = document.querySelector('#auto-rotate');
+const speed = document.querySelector('#speed');
+const speedValue = document.querySelector('#speed-value');
+const grid = document.querySelector('#show-grid');
+const cloudToggle = document.querySelector('#show-clouds');
+const cloudStatus = document.querySelector('#cloud-status');
+const cloudSource = document.querySelector('#cloud-source-link');
+const loading = document.querySelector('#loading-message');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const motion = new GlobeMotion({ autoRotate: !reducedMotion.matches });
 const reveal = new GlobeReveal({
   direction: [motion.driftAxis[1], motion.driftAxis[0]],
@@ -29,7 +29,7 @@ let requestInFlight = false;
 let cloudSnapshotPromise;
 
 function updateRevealState() {
-  canvas.dataset.reveal = reveal.active ? "running" : "complete";
+  canvas.dataset.reveal = reveal.active ? 'running' : 'complete';
   canvas.dataset.revealProgress = String(reveal.progress);
 }
 
@@ -41,14 +41,14 @@ function finishReveal() {
 
 function updateStatus() {
   const state = motion.dragging
-    ? "dragging"
+    ? 'dragging'
     : motion.autoRotate
-      ? "running"
-      : "paused";
-  autoRotate.setAttribute("aria-checked", String(motion.autoRotate));
-  document.querySelector("#rotation-description").textContent =
-    motion.autoRotate ? "最後に動かした方向へ" : "ドラッグで操作できます";
-  canvas.dataset.state = renderer ? state : "loading";
+      ? 'running'
+      : 'paused';
+  autoRotate.setAttribute('aria-checked', String(motion.autoRotate));
+  document.querySelector('#rotation-description').textContent =
+    motion.autoRotate ? '最後に動かした方向へ' : 'ドラッグで操作できます';
+  canvas.dataset.state = renderer ? state : 'loading';
   canvas.dataset.directionX = String(motion.driftAxis[1]);
   canvas.dataset.directionY = String(motion.driftAxis[0]);
   canvas.dataset.speed = String(motion.speed);
@@ -100,14 +100,14 @@ function endDrag(event) {
   activePointer = null;
   previousPointer = null;
   motion.endDrag();
-  canvas.classList.remove("is-dragging");
+  canvas.classList.remove('is-dragging');
   if (canvas.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
   previousFrame = 0;
   updateStatus();
   invalidate();
 }
 
-canvas.addEventListener("pointerdown", (event) => {
+canvas.addEventListener('pointerdown', (event) => {
   if (
     !renderer ||
     activePointer !== null ||
@@ -117,28 +117,28 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   event.preventDefault();
   finishReveal();
-  canvas.classList.add("is-pointer-focus");
+  canvas.classList.add('is-pointer-focus');
   canvas.focus({ preventScroll: true });
   activePointer = event.pointerId;
   previousPointer = { x: event.clientX, y: event.clientY };
   canvas.setPointerCapture(event.pointerId);
   motion.beginDrag();
   previousFrame = 0;
-  canvas.classList.add("is-dragging");
+  canvas.classList.add('is-dragging');
   updateStatus();
   invalidate();
 });
-canvas.addEventListener("pointermove", movePointer);
-canvas.addEventListener("pointerup", (event) => {
+canvas.addEventListener('pointermove', movePointer);
+canvas.addEventListener('pointerup', (event) => {
   movePointer(event);
   endDrag(event);
 });
-canvas.addEventListener("pointercancel", endDrag);
-canvas.addEventListener("lostpointercapture", endDrag);
-canvas.addEventListener("blur", () =>
-  canvas.classList.remove("is-pointer-focus"),
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('lostpointercapture', endDrag);
+canvas.addEventListener('blur', () =>
+  canvas.classList.remove('is-pointer-focus'),
 );
-window.addEventListener("blur", () => endDrag());
+window.addEventListener('blur', () => endDrag());
 
 function toggleRotation() {
   motion.setAutoRotate(!motion.autoRotate);
@@ -147,11 +147,11 @@ function toggleRotation() {
   invalidate();
 }
 
-autoRotate.addEventListener("click", toggleRotation);
-canvas.addEventListener("keydown", (event) => {
-  canvas.classList.remove("is-pointer-focus");
+autoRotate.addEventListener('click', toggleRotation);
+canvas.addEventListener('keydown', (event) => {
+  canvas.classList.remove('is-pointer-focus');
   if (!renderer || activePointer !== null) return;
-  if (event.code === "Space") {
+  if (event.code === 'Space') {
     event.preventDefault();
     if (!event.repeat) toggleRotation();
     return;
@@ -185,31 +185,31 @@ function updateSpeed() {
     ? multiplier.toFixed(1)
     : multiplier.toFixed(2);
   speedValue.value = `${formatted}×`;
-  speed.setAttribute("aria-valuetext", `${formatted}倍`);
+  speed.setAttribute('aria-valuetext', `${formatted}倍`);
   speed.style.setProperty(
-    "--range-progress",
+    '--range-progress',
     `${((multiplier - 0.25) / 1.75) * 100}%`,
   );
   updateStatus();
   invalidate();
 }
-speed.addEventListener("input", updateSpeed);
+speed.addEventListener('input', updateSpeed);
 
-grid.addEventListener("change", () => {
+grid.addEventListener('change', () => {
   if (renderer) renderer.showGrid = grid.checked;
   invalidate();
 });
-cloudToggle.addEventListener("change", () => {
+cloudToggle.addEventListener('change', () => {
   if (renderer) renderer.showClouds = cloudToggle.checked;
   invalidate();
 });
 
-document.querySelector("#reset").addEventListener("click", () => {
+document.querySelector('#reset').addEventListener('click', () => {
   finishReveal();
   endDrag();
   motion.reset();
   motion.setAutoRotate(!reducedMotion.matches);
-  speed.value = "1";
+  speed.value = '1';
   updateSpeed();
   grid.checked = false;
   if (renderer) renderer.showGrid = false;
@@ -222,8 +222,8 @@ document.querySelector("#reset").addEventListener("click", () => {
 
 const resizeObserver = new ResizeObserver(() => invalidate());
 resizeObserver.observe(stage);
-window.addEventListener("resize", invalidate);
-document.addEventListener("visibilitychange", () => {
+window.addEventListener('resize', invalidate);
+document.addEventListener('visibilitychange', () => {
   previousFrame = 0;
   if (document.hidden) {
     endDrag();
@@ -231,7 +231,7 @@ document.addEventListener("visibilitychange", () => {
     frameId = 0;
   } else invalidate();
 });
-reducedMotion.addEventListener("change", (event) => {
+reducedMotion.addEventListener('change', (event) => {
   if (event.matches) {
     finishReveal();
     motion.setAutoRotate(false);
@@ -252,24 +252,24 @@ function getCloudSnapshot() {
       );
       if (!response.ok) throw new Error(`Cloud data: HTTP ${response.status}`);
       const clouds = parseCloudSnapshot(await response.json());
-      const date = new Intl.DateTimeFormat("ja-JP", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
+      const date = new Intl.DateTimeFormat('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: false,
-        timeZoneName: "short",
+        timeZoneName: 'short',
       }).format(new Date(clouds.observedAt));
       const kind = {
-        forecast: "モデル推定",
-        analysis: "解析値",
-        satellite: "衛星観測",
+        forecast: 'モデル推定',
+        analysis: '解析値',
+        satellite: '衛星観測',
       }[clouds.source.kind];
       const missing =
         clouds.coverage < 1
           ? ` · データなし ${((1 - clouds.coverage) * 100).toFixed(1)}%`
-          : "";
+          : '';
       cloudStatus.textContent = `雲の対象日時：${date} · ${kind}${missing}`;
       cloudStatus.dataset.observedAt = clouds.observedAt;
       cloudSource.textContent = clouds.source.name;
@@ -280,7 +280,7 @@ function getCloudSnapshot() {
       return clouds;
     } catch {
       cloudStatus.textContent =
-        "雲データを利用できません。地表のみ表示しています。";
+        '雲データを利用できません。地表のみ表示しています。';
       cloudSource.hidden = true;
       cloudToggle.checked = false;
       cloudToggle.disabled = true;
@@ -294,8 +294,8 @@ async function initialize() {
   if (requestInFlight) return;
   requestInFlight = true;
   loading.hidden = false;
-  loading.classList.remove("is-error");
-  loading.textContent = "世界を描いています…";
+  loading.classList.remove('is-error');
+  loading.textContent = '世界を描いています…';
   const cloudsPromise = getCloudSnapshot();
   try {
     const response = await fetch(
@@ -305,13 +305,13 @@ async function initialize() {
     const image = await createImageBitmap(await response.blob());
     let surface;
     try {
-      const mapCanvas = document.createElement("canvas");
+      const mapCanvas = document.createElement('canvas');
       mapCanvas.width = image.width;
       mapCanvas.height = image.height;
-      const mapContext = mapCanvas.getContext("2d", {
+      const mapContext = mapCanvas.getContext('2d', {
         willReadFrequently: true,
       });
-      if (!mapContext) throw new Error("Canvas 2D is unavailable");
+      if (!mapContext) throw new Error('Canvas 2D is unavailable');
       mapContext.drawImage(image, 0, 0);
       surface = {
         width: image.width,
@@ -331,15 +331,15 @@ async function initialize() {
     updateStatus();
     invalidate();
   } catch (error) {
-    console.error("Unable to initialize the globe:", error);
-    loading.classList.add("is-error");
+    console.error('Unable to initialize the globe:', error);
+    loading.classList.add('is-error');
     loading.replaceChildren(
-      document.createTextNode("地図を読み込めませんでした。"),
+      document.createTextNode('地図を読み込めませんでした。'),
     );
-    const retry = document.createElement("button");
-    retry.type = "button";
-    retry.textContent = "もう一度試す";
-    retry.addEventListener("click", initialize);
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.textContent = 'もう一度試す';
+    retry.addEventListener('click', initialize);
     loading.append(retry);
   } finally {
     requestInFlight = false;

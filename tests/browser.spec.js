@@ -319,7 +319,7 @@ test('rotation changes diamond colours while actual drawn vertices, sizes, and p
       canvas.remove();
     }
   });
-  expect(result.dotCount).toBeGreaterThan(1000);
+  expect(result.dotCount).toBeGreaterThan(15000);
   expect(result.diamondCount).toBe(result.dotCount);
   expect(result.allClosedEqualSquares).toBe(true);
   expect(result.reusedGrid).toBe(true);

@@ -26,7 +26,7 @@ function fixtureSurface() {
 test('the fixed circular grid maps every dot onto the visible unit hemisphere', () => {
   for (const [width, height] of [[420, 420], [720, 420], [320, 460]]) {
     const { dots, radius, dotRadius } = createDotGrid(width, height);
-    assert.ok(dots.length > 1000, 'The display should contain a dense dot field');
+    assert.ok(dots.length > 2000, 'The display should contain a dense dot field');
     assert.ok(dotRadius > 0);
     assert.ok(radius < Math.min(width, height) / 2);
     for (const dot of dots) {
