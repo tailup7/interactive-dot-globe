@@ -15,6 +15,7 @@ const cloudStatus = document.querySelector('#cloud-status');
 const cloudSource = document.querySelector('#cloud-source-link');
 const loading = document.querySelector('#loading-message');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const cloudApiUrl = import.meta.env.VITE_CLOUD_API_URL?.trim();
 const motion = new GlobeMotion({ autoRotate: !reducedMotion.matches });
 const reveal = new GlobeReveal({
   direction: [motion.driftAxis[1], motion.driftAxis[0]],
@@ -240,45 +241,83 @@ reducedMotion.addEventListener('change', (event) => {
   }
 });
 
-/** Load the local build snapshot once, also across terrain-load retries. */
+async function loadCloudSnapshot(url, cacheMode) {
+  const response = await fetch(url, {
+    cache: cacheMode,
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok) throw new Error(`Cloud data: HTTP ${response.status}`);
+  const data = await response.json();
+  return { clouds: parseCloudSnapshot(data), cache: data.cache };
+}
+
+function showCloudStatus(clouds, { cacheStatus, fallback = false } = {}) {
+  const date = new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZoneName: 'short',
+  }).format(new Date(clouds.observedAt));
+  const kind = {
+    forecast: 'モデル推定',
+    analysis: '解析値',
+    satellite: '衛星観測',
+  }[clouds.source.kind];
+  const missing =
+    clouds.coverage < 1
+      ? ` · データなし ${((1 - clouds.coverage) * 100).toFixed(1)}%`
+      : '';
+  const freshness =
+    cacheStatus === 'stale'
+      ? ' · 前回取得データ'
+      : fallback
+        ? ' · 保存済みデータ'
+        : '';
+  cloudStatus.textContent = `雲の対象日時：${date} · ${kind}${missing}${freshness}`;
+  cloudStatus.dataset.observedAt = clouds.observedAt;
+  cloudStatus.dataset.cacheStatus = cacheStatus ?? (fallback ? 'fallback' : 'local');
+  cloudSource.textContent = clouds.source.name;
+  cloudSource.href = clouds.source.url;
+  cloudSource.title = clouds.source.attribution;
+  cloudSource.hidden = false;
+  cloudToggle.disabled = false;
+}
+
+/**
+ * Each page load validates the server-side cache. A bundled snapshot keeps the
+ * globe usable if the public cloud endpoint or its weather provider is down.
+ */
 function getCloudSnapshot() {
   cloudSnapshotPromise ??= (async () => {
     try {
-      const response = await fetch(
+      if (cloudApiUrl) {
+        const { clouds, cache } = await loadCloudSnapshot(cloudApiUrl, 'no-store');
+        showCloudStatus(clouds, { cacheStatus: cache?.status });
+        return clouds;
+      }
+      const { clouds } = await loadCloudSnapshot(
         `${import.meta.env.BASE_URL}data/clouds.json`,
-        {
-          signal: AbortSignal.timeout(10000),
-        },
+        'default',
       );
-      if (!response.ok) throw new Error(`Cloud data: HTTP ${response.status}`);
-      const clouds = parseCloudSnapshot(await response.json());
-      const date = new Intl.DateTimeFormat('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        timeZoneName: 'short',
-      }).format(new Date(clouds.observedAt));
-      const kind = {
-        forecast: 'モデル推定',
-        analysis: '解析値',
-        satellite: '衛星観測',
-      }[clouds.source.kind];
-      const missing =
-        clouds.coverage < 1
-          ? ` · データなし ${((1 - clouds.coverage) * 100).toFixed(1)}%`
-          : '';
-      cloudStatus.textContent = `雲の対象日時：${date} · ${kind}${missing}`;
-      cloudStatus.dataset.observedAt = clouds.observedAt;
-      cloudSource.textContent = clouds.source.name;
-      cloudSource.href = clouds.source.url;
-      cloudSource.title = clouds.source.attribution;
-      cloudSource.hidden = false;
-      cloudToggle.disabled = false;
+      showCloudStatus(clouds);
       return clouds;
-    } catch {
+    } catch (liveError) {
+      if (cloudApiUrl) {
+        try {
+          const { clouds } = await loadCloudSnapshot(
+            `${import.meta.env.BASE_URL}data/clouds.json`,
+            'default',
+          );
+          console.warn('Cloud API unavailable; using the bundled snapshot.', liveError);
+          showCloudStatus(clouds, { fallback: true });
+          return clouds;
+        } catch (fallbackError) {
+          console.warn('Bundled cloud snapshot is also unavailable.', fallbackError);
+        }
+      }
       cloudStatus.textContent =
         '雲データを利用できません。地表のみ表示しています。';
       cloudSource.hidden = true;

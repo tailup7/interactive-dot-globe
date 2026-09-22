@@ -7,18 +7,20 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "predev": "npm run fetch:clouds",
     "dev": "vite --host 127.0.0.1",
-    "prebuild": "npm run fetch:clouds",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test tests/*.test.js",
     "test:browser": "playwright test",
     "generate:map": "python scripts/generate-surface-map.py",
-    "fetch:clouds": "node scripts/fetch-clouds.mjs"
+    "fetch:clouds": "node scripts/fetch-clouds.mjs",
+    "package:lambda": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-lambda.ps1"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1137.0"
   }
 }

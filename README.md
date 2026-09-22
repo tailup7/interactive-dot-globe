@@ -26,13 +26,15 @@ npm run dev
 
 初回表示では、初期回転軸から求めた画面上の回転方向（初期状態は左から右）へ、地球儀と同じ角速度でドットを順にフェードインさせます。実際に回転した角度だけ出現境界を進めるため、速度変更・一時停止・タブ非表示からの復帰でも回転と同期します。標準速度では半回転に約11秒、最後のフェードを含めて約11秒で全体が現れます。ドットは移動・拡大させず、不透明度だけを変えます。ドラッグ・矢印キー・リセットで直接操作を始めると演出を完了し、再実行しません。雲・経緯線の切り替えでは演出を継続します。モーション軽減設定が有効な場合は演出を省略します。
 
-Canvas 自体は 2D です。WebGL、Three.js、外部地図 API、API キーは不要です。ブラウザーは地図と雲のデータを配信サイト内のファイルから読み込みます。フォントのみ Google Fonts を使用し、取得できない場合はシステムフォントに切り替わります。
+Canvas 自体は 2D です。WebGL、Three.js、外部地図 API、API キーは不要です。地図は配信サイト内のファイルから読み込みます。雲は設定時のみAWS Lambdaの公開APIから読み込み、未設定または障害時には配信サイト内の予備データを使います。フォントのみ Google Fonts を使用し、取得できない場合はシステムフォントに切り替わります。
 
 ## 雲データ
 
 NOAA GFS の全球の総雲量を、UCAR の公開 THREDDS NCSS 経由で取得します。気象モデルによる推定値であり、衛星のリアルタイム観測画像ではありません。画面にはデータの対象日時と出典を表示します。
 
-`npm run dev` と `npm run build` は、それぞれ `predev` / `prebuild` で取得スクリプトを一度実行し、`public/data/clouds.json` に保存します。その後は、地球儀の回転中も同じ分布を使います。ブラウザーから外部の気象サービスへのアクセスや、定期的な取得は行いません。`npm run preview` やビルド済みの `dist/` を配信するときも、外部データは取得しません。
+通常の `npm run dev` と `npm run build` は気象サービスへアクセスしません。`public/data/clouds.json` は、Lambda APIが利用できないときだけ使う予備データです。
+
+AWSでアクセス時更新を有効にするには、Lambda Function URLを `VITE_CLOUD_API_URL` に設定してビルドします。ブラウザーはページを開くたびにこのURLを呼び、LambdaがS3内の `clouds/current.json` の `fetchedAt` を検査します。標準設定では1時間以内なら保存済みJSONを返し、期限切れならUCAR/NOAA GFSから取得・検証してからS3を更新します。更新に失敗した場合は直前の有効なS3データを返し、画面に「前回取得データ」と表示します。S3にもAPIにも到達できないときは、同梱の予備データを使います。
 
 手動で雲データを更新する場合は、次のコマンドを使います。
 
@@ -40,9 +42,9 @@ NOAA GFS の全球の総雲量を、UCAR の公開 THREDDS NCSS 経由で取得�
 npm run fetch:clouds
 ```
 
-開発中は保存後にページを再読み込みすると、新しいデータを読み込めます。静的サイトへの反映には再ビルドと再配置が必要です。通常の再ビルドでも雲データを取得します。
+開発中に予備データを更新する場合は、保存後にページを再読み込みしてください。静的サイトへ反映するには再ビルドと再配置が必要です。
 
-取得に失敗した場合、スクリプトは非ゼロの終了コードを返し、開発サーバーの起動やビルドを中止します。前回正常に保存できたデータは保持しますが、古いデータのまま成功扱いで処理を続行することはありません。ブラウザーで保存済みファイルの読み込みに失敗した場合は、雲を非表示にして警告を表示し、「雲を表示」を無効にします。地球儀の回転や地表の表示は引き続き利用できます。
+手動更新スクリプトが失敗した場合は非ゼロの終了コードを返し、前回正常に保存できたデータを保持します。ブラウザーでAPIと予備データの両方を読み込めない場合は、雲を非表示にして警告を表示し、「雲を表示」を無効にします。地球儀の回転や地表の表示は引き続き利用できます。
 
 保存形式は `version: 1` の JSON です。`width` と `height` は格子の大きさ、`values` は各地点の雲量（0〜1、欠測は `null`）を表します。`observedAt` はモデルの対象時刻、`fetchedAt` は取得時刻、任意の `modelRunAt` はモデルの実行時刻です。`observedAt` というフィールド名は実測を意味しません。`source` には `name`、`url`、`kind: "forecast"`、`attribution` を記録します。
 
@@ -62,14 +64,18 @@ npm run fetch:clouds
 | `public/data/README.md`           | 地図の出典、ライセンス、生成方法                         |
 | `scripts/generate-surface-map.py` | 世界地図画像の再生成                                     |
 | `scripts/fetch-clouds.mjs`        | 公開気象モデルから雲データを取得・保存                   |
+| `lambda/index.mjs`                | S3キャッシュと気象APIを扱うLambda Function URLハンドラー |
+| `lambda/package.json`             | Lambda ZIPに同梱する依存関係                             |
+| `scripts/package-lambda.ps1`      | WindowsでLambda用ZIPを生成するスクリプト                 |
 
 ## ビルドと検証
 
 ```sh
-npm run build        # 雲データを取得し、dist/ に静的サイトを出力
+npm run build        # 外部気象APIにアクセスせず、dist/ に静的サイトを出力
 npm run preview      # ビルド結果をローカルで確認
 npm test             # 回転計算・描画のユニットテスト
 npm run test:browser # Chrome でブラウザー操作を検証
+npm run package:lambda # artifacts/lambda/ にLambda用ZIPを出力（Windows）
 ```
 
 ブラウザーテストには Google Chrome が必要です。未インストールの環境では `npx playwright install chrome` で導入できます。回転前後のドットの位置・半径の固定、地表の色の変化に加え、ドラッグ方向、終了後の回転、一時停止、設定、キーボード、タッチ、モーション軽減を確認します。
@@ -88,3 +94,76 @@ Windows で `python` が使えない場合は、インストール済みの Pyth
 [Natural Earth](https://www.naturalearthdata.com/) の Natural Earth II ラスター画像を使用しています。
 地図データは [Public Domain](https://www.naturalearthdata.com/about/terms-of-use/) です。詳細は [public/data/README.md](public/data/README.md) を参照してください。
 解像度の小さい地図を点で表現しているため、非常に小さい島は省略される場合があります。
+
+
+## デプロイ構成
+
+```mermaid
+flowchart LR
+  U[利用者のブラウザ] --> F[AWS Amplify Hosting]
+  U --> L[Lambda Function URL]
+  L <--> S[非公開 S3 バケット<br/>clouds/current.json]
+  L --> G[UCAR / NOAA GFS]
+```
+
+アクセス時は以下の処理
+
+1. ブラウザが地球儀画面をAWS Amplifyから取得
+2. ブラウザがLambda Function URLを呼ぶ
+3. LambdaがS3の `fetchedAt` を確認する
+4. 例えば1時間以内なら、そのJSONを即座に返す
+5. 期限切れならUCAR/NOAA GFSから取得・検証し、成功時だけS3のJSONを置き換えて返す
+6. 気象APIが失敗した場合は最後に成功したJSONを返し、画面では対象時刻と「前回取得データ」を示す
+
+
+## AWS 本番構成
+
+- リージョン: `ap-northeast-1`
+- 静的サイト: AWS Amplify Hosting
+- 雲API: Lambda Function URL
+- 雲キャッシュ: 非公開S3バケット `<cloud-cache-bucket>`
+- 気象データ: UCAR THREDDS 経由の NOAA GFS 総雲量
+- キャッシュ期間: 3,600秒（1時間）
+
+### Lambda
+
+- 関数名: `interactive-dot-globe-cloud-api`
+- ランタイム: Node.js
+- メモリ: 512MB
+- タイムアウト: 45秒
+- ハンドラー: `lambda/index.handler`
+- VPC: 使用しない
+<!--
+- 同時実行数: 5
+-->
+
+Lambda環境変数:
+
+| 変数 | 値 |
+| --- | --- |
+| `CLOUD_BUCKET` | `<cloud-cache-bucket>` |
+| `CLOUD_KEY` | `clouds/current.json` |
+| `CACHE_TTL_SECONDS` | `3600` |
+| `WEATHER_TIMEOUT_MS` | `40000` |
+
+Lambda実行ロールは、`clouds/current.json` に対する
+`s3:GetObject` と `s3:PutObject` のみを許可する。
+
+### 雲データの動作
+
+1. ページ表示時、ブラウザがLambda Function URLへGETする。
+2. LambdaはS3キャッシュを確認する。
+3. 1時間以内ならキャッシュを返す。
+4. 期限切れならGFSから取得・検証してS3を更新する。
+5. 更新失敗時は前回正常なデータを返す。
+6. LambdaとS3の両方が利用できない場合、ブラウザは同梱の予備データを使う。
+
+### デプロイ手順
+
+1. `npm ci`
+2. `npm test`
+3. `npm run build`
+4. `npm run package:lambda`
+5. `artifacts/lambda/interactive-dot-globe-cloud-api.zip` をLambdaへアップロード
+6. Amplifyで `VITE_CLOUD_API_URL` にFunction URLを設定して再デプロイ
+7. Lambda Function URLのCORS許可元にAmplify本番URLを設定する
