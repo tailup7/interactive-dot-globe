@@ -20,69 +20,21 @@
           ></span>
           orbital<span class="brand-period">.</span>
         </a>
-        <span class="header-label">AN INTERACTIVE LITTLE PLANET</span>
-        <a class="help-link" href="#how-it-works"
-          >使い方 <span aria-hidden="true">↗</span></a
-        >
       </header>
 
       <main>
-        <section class="hero" aria-labelledby="hero-title">
-          <div class="hero-copy">
-            <div class="eyebrow"><span></span> A WORLD IN MOTION</div>
-            <h1 id="hero-title">
-              世界を、<br />思いのままに<span class="title-period">。</span>
-            </h1>
-            <p class="hero-description">
-              動かないドットに、海と大地の色がめぐる。<br
-                class="desktop-break"
-              />ドラッグして、あなただけの視点を見つけよう。
-            </p>
-            <button class="explore-button" id="explore" type="button">
-              地球にふれてみる
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M5 12h14m-6-6 6 6-6 6" />
-              </svg>
-            </button>
-            <div class="gesture-note">
-              <svg viewBox="0 0 24 28" fill="none" aria-hidden="true">
-                <rect x="5" y="2" width="14" height="22" rx="7" />
-                <path d="M12 6v5M9 27h6" />
-              </svg>
-              <span
-                >クリックしたまま動かす。<br />手を離して、流れにまかせる。</span
-              >
-            </div>
-          </div>
-
+        <section class="hero" aria-label="操作できるドット地球儀">
           <div class="globe-column">
             <div class="stage" id="globe-stage">
-              <div class="stage-heading">
-                <span class="status-led" id="status-led"></span
-                ><span id="motion-status" role="status">読み込み中</span>
-              </div>
-              <span class="stage-index">FIG. 001 / EARTH</span>
               <canvas
                 id="globe"
                 tabindex="0"
                 role="img"
                 aria-label="固定されたドットの色で回転を表す地球儀。ドラッグや矢印キーで回転、スペースキーで自動回転を切り替えます。"
-                aria-describedby="globe-instructions"
                 >この地球儀の表示には Canvas 対応ブラウザーが必要です。</canvas
               >
               <div class="loading-message" id="loading-message">
                 世界を描いています<span>…</span>
-              </div>
-              <div class="stage-bottom">
-                <span id="coordinates">12.0° N &nbsp; 25.0° E</span
-                ><span class="drag-hint"
-                  ><svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path
-                      d="M10 2v16M2 10h16M7 5l3-3 3 3M7 15l3 3 3-3M5 7l-3 3 3 3M15 7l3 3-3 3"
-                    />
-                  </svg>
-                  DRAG TO EXPLORE</span
-                >
               </div>
             </div>
           </div>
@@ -182,33 +134,6 @@
             >データの出典 <span aria-hidden="true">↗</span></a
           >
         </p>
-
-        <section
-          class="how-it-works"
-          id="how-it-works"
-          aria-labelledby="how-title"
-        >
-          <div class="how-intro">
-            <span class="eyebrow small">A LITTLE GUIDE</span>
-            <h2 id="how-title">ふれると、世界が動きだす。</h2>
-          </div>
-          <div class="guide-item">
-            <span class="guide-icon" aria-hidden="true">↔</span>
-            <div>
-              <h3>自由にドラッグ</h3>
-              <p id="globe-instructions">
-                上下左右、斜めにも。動かした方向と速さに、地球がついてきます。
-              </p>
-            </div>
-          </div>
-          <div class="guide-item">
-            <span class="guide-icon orbit-icon" aria-hidden="true">↗</span>
-            <div>
-              <h3>そのまま、ゆっくり</h3>
-              <p>手を離すと、最後の方向へ。一定の速さで、回り続けます。</p>
-            </div>
-          </div>
-        </section>
       </main>
 
       <footer class="site-footer">

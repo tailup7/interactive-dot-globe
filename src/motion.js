@@ -1,4 +1,4 @@
-const DEFAULT_SPEED = 0.13;
+export const DEFAULT_SPEED = 0.2925;
 const MAX_FRAME_SECONDS = 0.05;
 const DEG = Math.PI / 180;
 
@@ -59,6 +59,7 @@ export class GlobeMotion {
     // initial viewing tilt. Dragging can still replace this screen-space axis.
     this.driftAxis = rotateVector([0, 1, 0], this.orientation);
     this.dragging = false;
+    this.lastStepAngle = 0;
   }
 
   beginDrag() {
@@ -96,6 +97,7 @@ export class GlobeMotion {
 
   /** Return whether a frame advanced; clamp long gaps after hidden tabs. */
   step(deltaSeconds) {
+    this.lastStepAngle = 0;
     if (
       this.dragging ||
       !this.autoRotate ||
@@ -105,10 +107,8 @@ export class GlobeMotion {
     )
       return false;
 
-    this.rotate(
-      this.driftAxis,
-      this.speed * Math.min(deltaSeconds, MAX_FRAME_SECONDS),
-    );
+    this.lastStepAngle = this.speed * Math.min(deltaSeconds, MAX_FRAME_SECONDS);
+    this.rotate(this.driftAxis, this.lastStepAngle);
     return true;
   }
 

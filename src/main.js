@@ -1,13 +1,11 @@
 import "./style.css";
-import { GlobeMotion, rotateVector } from "./motion.js";
+import { DEFAULT_SPEED, GlobeMotion } from "./motion.js";
 import { GlobeRenderer } from "./renderer.js";
 import { parseCloudSnapshot } from "./clouds.js";
+import { GlobeReveal } from "./reveal.js";
 
-const DEFAULT_SPEED = 0.13;
 const canvas = document.querySelector("#globe");
 const stage = document.querySelector("#globe-stage");
-const status = document.querySelector("#motion-status");
-const statusLed = document.querySelector("#status-led");
 const autoRotate = document.querySelector("#auto-rotate");
 const speed = document.querySelector("#speed");
 const speedValue = document.querySelector("#speed-value");
@@ -16,17 +14,30 @@ const cloudToggle = document.querySelector("#show-clouds");
 const cloudStatus = document.querySelector("#cloud-status");
 const cloudSource = document.querySelector("#cloud-source-link");
 const loading = document.querySelector("#loading-message");
-const coordinates = document.querySelector("#coordinates");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const motion = new GlobeMotion({ autoRotate: !reducedMotion.matches });
+const reveal = new GlobeReveal({
+  direction: [motion.driftAxis[1], motion.driftAxis[0]],
+  reducedMotion: reducedMotion.matches,
+});
 let renderer = null;
 let activePointer = null;
 let previousPointer = null;
 let frameId = 0;
 let previousFrame = 0;
-let lastCoordinateUpdate = 0;
 let requestInFlight = false;
 let cloudSnapshotPromise;
+
+function updateRevealState() {
+  canvas.dataset.reveal = reveal.active ? "running" : "complete";
+  canvas.dataset.revealProgress = String(reveal.progress);
+}
+
+function finishReveal() {
+  reveal.finish();
+  updateRevealState();
+  invalidate();
+}
 
 function updateStatus() {
   const state = motion.dragging
@@ -34,30 +45,13 @@ function updateStatus() {
     : motion.autoRotate
       ? "running"
       : "paused";
-  const labels = {
-    dragging: "ドラッグ中",
-    running: "自動回転中",
-    paused: "一時停止中",
-  };
-  if (renderer && status.textContent !== labels[state])
-    status.textContent = labels[state];
   autoRotate.setAttribute("aria-checked", String(motion.autoRotate));
-  statusLed.classList.toggle("is-paused", state === "paused");
   document.querySelector("#rotation-description").textContent =
     motion.autoRotate ? "最後に動かした方向へ" : "ドラッグで操作できます";
   canvas.dataset.state = renderer ? state : "loading";
   canvas.dataset.directionX = String(motion.driftAxis[1]);
   canvas.dataset.directionY = String(motion.driftAxis[0]);
   canvas.dataset.speed = String(motion.speed);
-}
-
-function updateCoordinates() {
-  const [x, y, z, w] = motion.orientation;
-  const center = rotateVector([0, 0, 1], [-x, -y, -z, w]);
-  const latitude =
-    (Math.asin(Math.max(-1, Math.min(1, center[1]))) * 180) / Math.PI;
-  const longitude = (Math.atan2(center[0], center[2]) * 180) / Math.PI;
-  coordinates.textContent = `${Math.abs(latitude).toFixed(1)}° ${latitude < 0 ? "S" : "N"}   ${Math.abs(longitude).toFixed(1)}° ${longitude < 0 ? "W" : "E"}`;
 }
 
 function invalidate() {
@@ -71,17 +65,13 @@ function frame(timestamp) {
     previousFrame = 0;
     return;
   }
-  if (previousFrame) motion.step((timestamp - previousFrame) / 1000);
-  previousFrame = timestamp;
-  renderer.draw(motion.orientation);
-  if (
-    timestamp - lastCoordinateUpdate > 120 ||
-    !motion.autoRotate ||
-    motion.dragging
-  ) {
-    updateCoordinates();
-    lastCoordinateUpdate = timestamp;
+  if (previousFrame) {
+    const seconds = (timestamp - previousFrame) / 1000;
+    if (motion.step(seconds)) reveal.advance(motion.lastStepAngle);
   }
+  previousFrame = timestamp;
+  renderer.draw(motion.orientation, reveal);
+  updateRevealState();
   if (motion.autoRotate && !motion.dragging) invalidate();
   else previousFrame = 0;
 }
@@ -126,6 +116,7 @@ canvas.addEventListener("pointerdown", (event) => {
   )
     return;
   event.preventDefault();
+  finishReveal();
   canvas.classList.add("is-pointer-focus");
   canvas.focus({ preventScroll: true });
   activePointer = event.pointerId;
@@ -174,6 +165,7 @@ canvas.addEventListener("keydown", (event) => {
   const direction = directions[event.key];
   if (!direction) return;
   event.preventDefault();
+  finishReveal();
   const distance = renderer.radius * (event.shiftKey ? 0.18 : 0.075);
   motion.beginDrag();
   motion.dragBy(
@@ -213,6 +205,7 @@ cloudToggle.addEventListener("change", () => {
 });
 
 document.querySelector("#reset").addEventListener("click", () => {
+  finishReveal();
   endDrag();
   motion.reset();
   motion.setAutoRotate(!reducedMotion.matches);
@@ -222,25 +215,10 @@ document.querySelector("#reset").addEventListener("click", () => {
   if (renderer) renderer.showGrid = false;
   cloudToggle.checked = Boolean(renderer?.clouds);
   if (renderer) renderer.showClouds = cloudToggle.checked;
-  updateCoordinates();
   previousFrame = 0;
   updateStatus();
   invalidate();
 });
-
-document.querySelector("#explore").addEventListener("click", () => {
-  canvas.scrollIntoView({
-    behavior: reducedMotion.matches ? "instant" : "smooth",
-    block: "center",
-  });
-  canvas.focus({ preventScroll: true });
-  stage.classList.remove("is-invited");
-  void stage.offsetWidth;
-  stage.classList.add("is-invited");
-});
-stage.addEventListener("animationend", () =>
-  stage.classList.remove("is-invited"),
-);
 
 const resizeObserver = new ResizeObserver(() => invalidate());
 resizeObserver.observe(stage);
@@ -255,6 +233,7 @@ document.addEventListener("visibilitychange", () => {
 });
 reducedMotion.addEventListener("change", (event) => {
   if (event.matches) {
+    finishReveal();
     motion.setAutoRotate(false);
     updateStatus();
     invalidate();
@@ -317,7 +296,6 @@ async function initialize() {
   loading.hidden = false;
   loading.classList.remove("is-error");
   loading.textContent = "世界を描いています…";
-  status.textContent = "読み込み中";
   const cloudsPromise = getCloudSnapshot();
   try {
     const response = await fetch(
@@ -347,13 +325,13 @@ async function initialize() {
     renderer = new GlobeRenderer(canvas, surface, clouds);
     renderer.showGrid = grid.checked;
     renderer.showClouds = cloudToggle.checked;
-    renderer.draw(motion.orientation);
+    renderer.draw(motion.orientation, reveal);
+    updateRevealState();
     loading.hidden = true;
     updateStatus();
     invalidate();
   } catch (error) {
     console.error("Unable to initialize the globe:", error);
-    status.textContent = "読み込みエラー";
     loading.classList.add("is-error");
     loading.replaceChildren(
       document.createTextNode("地図を読み込めませんでした。"),

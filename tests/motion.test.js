@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { GlobeMotion, rotateVector } from '../src/motion.js';
 
 function close(actual, expected, tolerance = 1e-12) {
-  assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} should equal ${expected}`);
+  assert.ok(
+    Math.abs(actual - expected) <= tolerance,
+    `${actual} should equal ${expected}`,
+  );
 }
 
 function vectorClose(actual, expected, tolerance = 1e-12) {
@@ -18,14 +21,20 @@ function identityMotion(options) {
 
 function angularDifference(a, b) {
   // This is stable for the small angles used in these tests.
-  const dot = Math.abs(a.reduce((sum, component, index) => sum + component * b[index], 0));
+  const dot = Math.abs(
+    a.reduce((sum, component, index) => sum + component * b[index], 0),
+  );
   return 2 * Math.acos(Math.min(1, dot));
 }
 
 test('initial view centers longitude 25° E and latitude 12° N', () => {
-  const longitude = 25 * Math.PI / 180;
-  const latitude = 12 * Math.PI / 180;
-  const place = [Math.cos(latitude) * Math.sin(longitude), Math.sin(latitude), Math.cos(latitude) * Math.cos(longitude)];
+  const longitude = (25 * Math.PI) / 180;
+  const latitude = (12 * Math.PI) / 180;
+  const place = [
+    Math.cos(latitude) * Math.sin(longitude),
+    Math.sin(latitude),
+    Math.cos(latitude) * Math.cos(longitude),
+  ];
   vectorClose(rotateVector(place, new GlobeMotion().orientation), [0, 0, 1]);
 });
 
@@ -33,12 +42,20 @@ test('right and downward drags move the visible surface in the same screen direc
   const horizontal = identityMotion();
   horizontal.beginDrag();
   assert.equal(horizontal.dragBy(100, 0, 200), true);
-  vectorClose(rotateVector([0, 0, 1], horizontal.orientation), [Math.sin(0.5), 0, Math.cos(0.5)]);
+  vectorClose(rotateVector([0, 0, 1], horizontal.orientation), [
+    Math.sin(0.5),
+    0,
+    Math.cos(0.5),
+  ]);
 
   const vertical = identityMotion();
   vertical.beginDrag();
   vertical.dragBy(0, 100, 200);
-  vectorClose(rotateVector([0, 0, 1], vertical.orientation), [0, -Math.sin(0.5), Math.cos(0.5)]);
+  vectorClose(rotateVector([0, 0, 1], vertical.orientation), [
+    0,
+    -Math.sin(0.5),
+    Math.cos(0.5),
+  ]);
 });
 
 test('drag distance controls rotation independently of event frequency', () => {
@@ -66,7 +83,11 @@ test('last actual drag direction persists through zero moves and release', () =>
 });
 
 test('diagonal and horizontal release have the same configured angular speed', () => {
-  for (const [dx, dy] of [[10, 0], [0, -10], [-3, 4]]) {
+  for (const [dx, dy] of [
+    [10, 0],
+    [0, -10],
+    [-3, 4],
+  ]) {
     const motion = identityMotion({ speed: 0.3 });
     motion.beginDrag();
     motion.dragBy(dx, dy, 200);
@@ -132,7 +153,11 @@ test('default rotation keeps geographic poles fixed while the equator moves, ini
     }
 
     const movedEquator = rotateVector([0, 0, 1], motion.orientation);
-    assert.ok(Math.hypot(...movedEquator.map((value, index) => value - equator[index])) > 1);
+    assert.ok(
+      Math.hypot(
+        ...movedEquator.map((value, index) => value - equator[index]),
+      ) > 1,
+    );
   }
 });
 
@@ -141,13 +166,20 @@ test('invalid inputs never corrupt state and zero speed pauses automatic movemen
   const initial = [...motion.orientation];
   assert.equal(motion.dragBy(10, 10, 100), false);
   motion.beginDrag();
-  for (const args of [[NaN, 1, 100], [1, Infinity, 100], [1, 1, 0], [1, 1, -1], [1, 1, NaN]]) {
+  for (const args of [
+    [NaN, 1, 100],
+    [1, Infinity, 100],
+    [1, 1, 0],
+    [1, 1, -1],
+    [1, 1, NaN],
+  ]) {
     assert.equal(motion.dragBy(...args), false);
   }
   motion.endDrag();
-  for (const delta of [NaN, Infinity, -1, 0]) assert.equal(motion.step(delta), false);
+  for (const delta of [NaN, Infinity, -1, 0])
+    assert.equal(motion.step(delta), false);
   for (const speed of [NaN, Infinity, -1]) motion.setSpeed(speed);
-  assert.equal(motion.speed, 0.13);
+  assert.equal(motion.speed, 0.2925);
   vectorClose(motion.orientation, initial);
   motion.setSpeed(0);
   assert.equal(motion.step(0.01), false);
@@ -172,7 +204,7 @@ test('reset restores the initial view and axis while preserving user settings', 
   motion.dragBy(-20, 10, 200);
   motion.reset();
   vectorClose(motion.orientation, new GlobeMotion().orientation);
-  const tilt = 12 * Math.PI / 180;
+  const tilt = (12 * Math.PI) / 180;
   vectorClose(motion.driftAxis, [0, Math.cos(tilt), Math.sin(tilt)]);
   assert.equal(motion.dragging, false);
   assert.equal(motion.autoRotate, false);

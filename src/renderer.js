@@ -1,6 +1,7 @@
 import { rotateVector } from "./motion.js";
 import { createDotGrid, sampleSurface } from "./surface.js";
 import { sampleCloudCover } from "./clouds.js";
+import { revealOpacity } from "./reveal.js";
 
 const TAU = Math.PI * 2;
 
@@ -69,12 +70,13 @@ export class GlobeRenderer {
     }
   }
 
-  draw(orientation) {
+  draw(orientation, reveal = null) {
     this.resize();
     const ctx = this.context;
     const r = this.radius;
     const cx = this.width / 2;
     const cy = this.height / 2;
+    ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, this.width, this.height);
     if (!r) return;
 
@@ -120,6 +122,11 @@ export class GlobeRenderer {
     ];
     for (let i = 0; i < this.dots.length; i++) {
       const dot = this.dots[i];
+      const alpha = reveal
+        ? revealOpacity(dot, reveal.progress, reveal.direction)
+        : 1;
+      if (alpha <= 0) continue;
+      ctx.globalAlpha = alpha;
       const { nx, ny, nz, shade } = dot;
       const x = inverse[0] * nx + inverse[1] * ny + inverse[2] * nz;
       const y = inverse[3] * nx + inverse[4] * ny + inverse[5] * nz;
@@ -127,10 +134,11 @@ export class GlobeRenderer {
       const color = sampleSurface(this.surface, x, y, z, this.sample);
       if (this.showClouds && this.clouds) {
         const opacity =
-          Math.pow(sampleCloudCover(this.clouds, x, y, z), 1.1) * 0.88;
-        color[0] += (245 - color[0]) * opacity;
-        color[1] += (248 - color[1]) * opacity;
-        color[2] += (252 - color[2]) * opacity;
+          Math.pow(sampleCloudCover(this.clouds, x, y, z), 1.1) * 0.6;
+        // Even total cloud cover retains 40% of the terrain color.
+        color[0] += (205 - color[0]) * opacity;
+        color[1] += (225 - color[1]) * opacity;
+        color[2] += (245 - color[2]) * opacity;
       }
       // Five bits per channel retains the atlas's many terrain colors while
       // letting us reuse CSS color strings instead of allocating per dot/frame.
@@ -143,6 +151,7 @@ export class GlobeRenderer {
       ctx.fillStyle = this.colorCache[key];
       ctx.fill(this.dotPaths[i]);
     }
+    ctx.globalAlpha = 1;
     if (this.showGrid) this.drawGraticule(orientation);
   }
 
