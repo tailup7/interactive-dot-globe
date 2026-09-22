@@ -76,9 +76,10 @@ svg {
 .brand {
   display: flex;
   align-items: center;
-  font-size: 29px;
+  font-size: clamp(14px, 2.1vw, 29px);
   font-weight: 650;
-  letter-spacing: -1.3px;
+  letter-spacing: -0.8px;
+  white-space: nowrap;
 }
 .brand-period {
   color: var(--accent);
@@ -534,7 +535,10 @@ input[type='range']::-moz-range-thumb {
     height: 76px;
   }
   .brand {
-    font-size: 27px;
+    font-size: 14px;
+  }
+  .brand-mark {
+    display: none;
   }
   .hero {
     display: flex;

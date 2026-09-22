@@ -1,4 +1,4 @@
-# orbital — Interactive dot globe
+# Interactive Globe with Live Clouds
 
 Canvas 2D で描く、ドラッグ操作に対応したドット地球儀
 
