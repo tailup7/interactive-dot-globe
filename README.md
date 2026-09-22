@@ -2,6 +2,9 @@
 
 Canvas 2D で描く、ドラッグ操作に対応したドット地球儀
 
+## 公開URL
+https://main.d24d2g1dsjnsk8.amplifyapp.com
+
 ## 起動
 
 Node.js 20.19 以上の 20 系、または 22.12 以上を使用してください。
